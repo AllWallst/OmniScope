@@ -21,29 +21,49 @@ def fetch_market_data(ticker_symbol, period="1mo"):
     """
     try:
         ticker = yf.Ticker(ticker_symbol)
-        info = ticker.info
-        history = ticker.history(period=period)
         
-        # Extended Data Points
-        recommendations = ticker.recommendations.tail(10) if ticker.recommendations is not None else pd.DataFrame()
-        major_holders = ticker.major_holders if ticker.major_holders is not None else pd.DataFrame()
-        institutional_holders = ticker.institutional_holders if ticker.institutional_holders is not None else pd.DataFrame()
-        financials = ticker.financials if ticker.financials is not None else pd.DataFrame()
-        balance_sheet = ticker.balance_sheet if ticker.balance_sheet is not None else pd.DataFrame()
-        cashflow = ticker.cashflow if ticker.cashflow is not None else pd.DataFrame()
+        # 1. Info & History (Essential)
+        try:
+            info = ticker.info
+            history = ticker.history(period=period)
+        except Exception:
+            # If info fails completely, return None as we need basic data
+            return None
+
+        # 2. Financials (Optional - prone to 404s)
+        financials = pd.DataFrame()
+        balance_sheet = pd.DataFrame()
+        cashflow = pd.DataFrame()
+        try:
+            financials = ticker.financials
+            balance_sheet = ticker.balance_sheet
+            cashflow = ticker.cashflow
+        except Exception:
+            pass # Use empty DFs
+            
+        # 3. Recommendations & Holders (Optional)
+        recommendations = pd.DataFrame()
+        major_holders = pd.DataFrame()
+        institutional_holders = pd.DataFrame()
+        try:
+           recommendations = ticker.recommendations
+           major_holders = ticker.major_holders
+           institutional_holders = ticker.institutional_holders
+        except Exception:
+           pass
 
         return {
             "info": info,
             "history": history,
-            "recommendations": recommendations,
-            "major_holders": major_holders,
-            "institutional_holders": institutional_holders,
             "financials": financials,
             "balance_sheet": balance_sheet,
-            "cashflow": cashflow
+            "cashflow": cashflow,
+            "recommendations": recommendations,
+            "major_holders": major_holders,
+            "institutional_holders": institutional_holders
         }
     except Exception as e:
-        print(f"Error fetching market data: {e}")
+        print(f"Error fetching market data for {ticker_symbol}: {e}")
         return None
 
 def fetch_news(query):
