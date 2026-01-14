@@ -672,9 +672,10 @@ if query:
                         
                         if not congress_data.empty:
                             try:
+                                # Fix for Streamlit deprecation: use_container_width=True -> width="stretch"
                                 st.dataframe(congress_data, use_container_width=True)
                             except:
-                                st.dataframe(congress_data) # Fallback
+                                st.dataframe(congress_data)
                             
                             # Simple stats
                             dem_trades = len(congress_data[congress_data['Party'] == 'Democrat'])
