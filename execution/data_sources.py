@@ -247,11 +247,7 @@ def analyze_sentiment(text_list):
     if count == 0:
         return 0, 0
         
-    if count == 0:
-        return 0, 0
-    except Exception as e:
-        print(f"Error fetching options data: {e}")
-        return None, None, 0, 0
+    return total_polarity / count, total_subjectivity / count
 
 def lookup_ticker(query):
     """
