@@ -205,35 +205,34 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
     url = f"https://www.quiverquant.com/congresstrading/stock/{ticker_symbol.strip().upper()}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
     
-    print(f"DEBUG: Scraping {url}")
+    debug_log = [f"Scraping {url}"]
+    
     try:
         r = requests.get(url, headers=headers, timeout=10)
         if r.status_code != 200:
-            print(f"DEBUG: Status Code {r.status_code}")
-            return pd.DataFrame()
+            debug_log.append(f"Status Code {r.status_code}")
+            df_empty = pd.DataFrame()
+            df_empty.attrs['debug_log'] = debug_log
+            return df_empty
             
         dfs = pd.read_html(StringIO(r.text))
         if not dfs:
-            print("DEBUG: No tables found via read_html")
-            return pd.DataFrame()
+            debug_log.append("No tables found via read_html")
+            df_empty = pd.DataFrame()
+            df_empty.attrs['debug_log'] = debug_log
+            return df_empty
             
         df = dfs[0]
-        print(f"DEBUG: Table found with {len(df)} rows. Columns: {df.columns.tolist()}")
-        # print(df.head(1).to_string()) # Uncomment for extreme debug
-        
-        # Expected columns: ['Stock', 'Transaction', 'Politician', 'Filed', 'Traded', 'Description']
+        debug_log.append(f"Table found with {len(df)} rows. Columns: {df.columns.tolist()}")
         
         trades = []
         for idx, row in df.iterrows():
             try:
                 # Parse Transaction (Type + Amount)
-                # Example: "Sale $1,001 - $15,000" or "Purchase $15,001 - $50,000"
                 raw_trans = str(row.get('Transaction', '')).strip()
                 
-                # Check directly for common transaction types to ensure we aren't parsing garbage
                 trans_type = "Unknown"
                 amount = "Unknown"
-                
                 lower_trans = raw_trans.lower()
                 
                 # Logic to identify Sale/Purchase
@@ -244,7 +243,6 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                     else:
                         parts = raw_trans.split(' ', 1)
                         if len(parts) > 1: amount = parts[1]
-                        
                 elif "purchase" in lower_trans:
                     trans_type = "Purchase"
                     if '$' in raw_trans:
@@ -255,23 +253,18 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                          parts = raw_trans.split(' ', 1)
                          if len(parts) > 1: amount = parts[1]
                 else:
-                    # Fallback for "Exchange" or other types
-                    # If we can't identify type, maybe row is bad?
-                    # But let's try standard split
                     parts = raw_trans.split(' ', 1)
                     if len(parts) > 0: trans_type = parts[0]
                     if len(parts) > 1: amount = parts[1]
 
-                # Parse Politician (Name + Chamber/Party)
+                # Parse Politician
                 raw_pol = str(row.get('Politician', ''))
-                
                 chamber = "Unknown"
                 party = "Unknown"
                 rep_name = raw_pol
                 
                 if "House" in raw_pol:
                     chamber = "House"
-                    # Split safely
                     split_val = raw_pol.split("House")
                     if len(split_val) > 0: rep_name = split_val[0].strip()
                 elif "Senate" in raw_pol:
@@ -293,15 +286,28 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                     "Price": "-" 
                 })
             except Exception as e:
-                print(f"DEBUG: Error parsing row {idx}: {e}")
+                debug_log.append(f"Error parsing row {idx}: {e}")
                 continue
                 
         if trades:
-            print(f"DEBUG: Successfully parsed {len(trades)} trades")
-            return pd.DataFrame(trades)
+            debug_log.append(f"Successfully parsed {len(trades)} trades")
+            res_df = pd.DataFrame(trades)
+            res_df.attrs['debug_log'] = debug_log
+            return res_df
             
-        print("DEBUG: Trades list empty after loop")
-        return pd.DataFrame()
+        debug_log.append("Trades list empty after loop. Check parsing logic against row content.")
+        if not df.empty:
+             debug_log.append(f"First row raw: {df.iloc[0].to_dict()}")
+             
+        df_empty = pd.DataFrame()
+        df_empty.attrs['debug_log'] = debug_log
+        return df_empty
+
+    except Exception as e:
+        debug_log.append(f"Error scraping Quiver Quant: {e}")
+        df_empty = pd.DataFrame()
+        df_empty.attrs['debug_log'] = debug_log
+        return df_empty
                 
         if trades:
             return pd.DataFrame(trades)
