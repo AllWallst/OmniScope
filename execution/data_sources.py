@@ -249,8 +249,33 @@ def analyze_sentiment(text_list):
         
     if count == 0:
         return 0, 0
+    except Exception as e:
+        print(f"Error fetching options data: {e}")
+        return None, None, 0, 0
+
+def lookup_ticker(query):
+    """
+    Searches for a ticker symbol using Yahoo Finance's public autocomplete API.
+    Returns the top match ticker (str) or None.
+    """
+    try:
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={urllib.parse.quote(query)}"
+        headers = {'User-Agent': USER_AGENT}
+        resp = requests.get(url, headers=headers)
+        data = resp.json()
         
-    return total_polarity / count, total_subjectivity / count
+        if 'quotes' in data and len(data['quotes']) > 0:
+            # Prefer equity results
+            for quote in data['quotes']:
+                 if quote.get('quoteType') == 'EQUITY' and quote.get('isYahooFinance', True):
+                     return quote['symbol']
+            # Fallback to first result
+            return data['quotes'][0]['symbol']
+            
+        return None
+    except Exception as e:
+        print(f"Error looking up ticker: {e}")
+        return None
 
 def fetch_reddit_posts(query, limit=10):
     """
