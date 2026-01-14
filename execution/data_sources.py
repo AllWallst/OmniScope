@@ -196,23 +196,23 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
     """
     Fetches congressional trading data by scraping capitoltrades.com/trades.
     This does NOT require an API Key.
-    It fetches recent trades (last 5 pages) and filters for the requested ticker.
+    It fetches recent trades (last 10 pages, ~1000 items) and filters for the requested ticker.
     """
     import requests
     import pandas as pd
     from io import StringIO
     import re
     
-    trades_url = "https://www.capitoltrades.com/trades"
+    # Use pageSize=100 to maximize data per request
+    base_url = "https://www.capitoltrades.com/trades?pageSize=100"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
     
     all_trades = []
     
-    # Fetch first few pages to get a good buffer of recent trades
-    # Note: Capitol Trades uses ?page=N for pagination
+    # Fetch more pages to get a better buffer (10 pages * 100 items = 1000 trades)
     try:
-        for page in range(1, 6): # Scrape first 5 pages (~480 trades)
-            url = f"{trades_url}?page={page}"
+        for page in range(1, 11): 
+            url = f"{base_url}&page={page}"
             r = requests.get(url, headers=headers, timeout=10)
             if r.status_code != 200:
                 break
@@ -222,43 +222,51 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                 if dfs:
                     df = dfs[0]
                     # The 'Traded Issuer' column often looks like "Company NameTICKER:US"
-                    # We need to extract the ticker.
-                    # Example: "Abbott LaboratoriesABT:US" -> ABT
                     
                     # Helper to extract ticker
                     def extract_ticker(text):
                         if not isinstance(text, str): return ""
                         # Regex to look for CAPITAL LETTERS followed by :US
+                        # e.g. "Apple IncAAPL:US" -> AAPL
                         match = re.search(r'([A-Z]+):US', text)
                         if match:
                             return match.group(1)
-                        # Fallback: maybe just the end?
+                        # Fallback: Check if the string ends with specific ticker pattern
                         return ""
                     
                     df['Ticker_Extracted'] = df['Traded Issuer'].apply(extract_ticker)
                     all_trades.append(df)
             except Exception as e:
+                # Page parsing failed, skip
                 pass
                 
         if all_trades:
             final_df = pd.concat(all_trades, ignore_index=True)
             
+            # Store total scanned count in metadata if possible, 
+            # but returning DF is standard. We can print it for debug logging.
+            scan_count = len(final_df)
+            
             # Filter by the requested ticker
             target_ticker = ticker_symbol.upper()
             filtered_df = final_df[final_df['Ticker_Extracted'] == target_ticker].copy()
             
+            # Create a stats dictionary to return if needed, but current contract returns DF.
+            # We can attach metadata to the DF attributes if needed.
+            filtered_df.attrs['scan_count'] = scan_count
+            
             if not filtered_df.empty:
                 # Rename columns for display
-                # Expected columns from Step 260: Politician, Traded Issuer, Published, Traded, Filed After, Owner, Type, Size, Price
+                # Expected columns from scrape: Politician, Traded Issuer, Published, Traded, Filed After, Owner, Type, Size, Price
                 filtered_df = filtered_df[['Politician', 'Traded', 'Type', 'Size', 'Price', 'Published']].copy()
                 filtered_df.columns = ['Representative', 'Transaction Date', 'Transaction', 'Amount', 'Price', 'Disclosed']
                 
-                # Clean Representative Name (remove Party/State suffix often mashed together)
-                # E.g. "Julia LetlowRepublicanHouseLA" -> "Julia Letlow" if possible, 
-                # but "RepublicanHouseLA" is useful info. 
-                # Let's keep it as is, or try to formatting it nicely if "Type" is camelCased.
-                
                 return filtered_df
+            elif scan_count > 0:
+                # Return empty DF but with scan count in attrs so UI can show "Scanned 1000 items"
+                empty_df = pd.DataFrame()
+                empty_df.attrs['scan_count'] = scan_count
+                return empty_df
             
         return pd.DataFrame()
         
