@@ -225,32 +225,57 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
         for _, row in df.iterrows():
             try:
                 # Parse Transaction (Type + Amount)
-                raw_trans = str(row.get('Transaction', ''))
-                parts = raw_trans.split(' ', 1)
-                trans_type = parts[0] if len(parts) > 0 else "Unknown"
-                amount = parts[1] if len(parts) > 1 else "Unknown"
+                # Example: "Sale $1,001 - $15,000" or "Purchase $15,001 - $50,000"
+                raw_trans = str(row.get('Transaction', '')).strip()
                 
+                # Check directly for common transaction types to ensure we aren't parsing garbage
+                trans_type = "Unknown"
+                amount = "Unknown"
+                
+                lower_trans = raw_trans.lower()
+                if "sale" in lower_trans:
+                    trans_type = "Sale"
+                    # Try to get the rest of the string as amount
+                    # e.g. "Sale (Partial) $1,001..." -> split by "Sale" or "Sale (Partial)"?
+                    # Safer: split by first '$' if present?
+                    if '$' in raw_trans:
+                        amount = raw_trans[raw_trans.find('$'):]
+                    else:
+                         parts = raw_trans.split(' ', 1)
+                         if len(parts) > 1: amount = parts[1]
+                elif "purchase" in lower_trans:
+                    trans_type = "Purchase"
+                    if '$' in raw_trans:
+                        amount = raw_trans[raw_trans.find('$'):]
+                    elif "exchange" in lower_trans:
+                         trans_type = "Exchange"
+                    else:
+                         parts = raw_trans.split(' ', 1)
+                         if len(parts) > 1: amount = parts[1]
+                else:
+                    # Fallback for "Exchange" or other types
+                    parts = raw_trans.split(' ', 1)
+                    if len(parts) > 0: trans_type = parts[0]
+                    if len(parts) > 1: amount = parts[1]
+
                 # Parse Politician (Name + Chamber/Party)
-                # Example: "Julie Johnson House / D"
+                # Example: "Julie Johnson House / D" or "Boozman, John Senate / R"
                 raw_pol = str(row.get('Politician', ''))
-                # Split by last few known patterns or just take the whole string for now
-                # Usually it ends with "House / D" or "Senate / R"
-                # Let's simple split by "House" or "Senate" if possible, or just keep it raw
-                # A robust way:
+                
                 chamber = "Unknown"
                 party = "Unknown"
                 rep_name = raw_pol
                 
+                # Normalize logic
                 if "House" in raw_pol:
                     chamber = "House"
                     rep_name = raw_pol.split("House")[0].strip()
-                    if "/ D" in raw_pol: party = "Democrat"
-                    elif "/ R" in raw_pol: party = "Republican"
                 elif "Senate" in raw_pol:
                     chamber = "Senate"
                     rep_name = raw_pol.split("Senate")[0].strip()
-                    if "/ D" in raw_pol: party = "Democrat"
-                    elif "/ R" in raw_pol: party = "Republican"
+                
+                if "/ D" in raw_pol: party = "Democrat"
+                elif "/ R" in raw_pol: party = "Republican"
                     
                 trades.append({
                     "Representative": rep_name,
@@ -260,9 +285,10 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                     "Disclosed": row.get('Filed', 'N/A'),
                     "Transaction": trans_type,
                     "Amount": amount,
-                    "Price": "-" # Quiver doesn't show price in main table
+                    "Price": "-" 
                 })
-            except:
+            except Exception as e:
+                # Skip bad rows silently
                 continue
                 
         if trades:
