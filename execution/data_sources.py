@@ -202,27 +202,29 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
     import pandas as pd
     from io import StringIO
     
-    url = f"https://www.quiverquant.com/congresstrading/stock/{ticker_symbol}"
+    url = f"https://www.quiverquant.com/congresstrading/stock/{ticker_symbol.strip().upper()}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
     
+    print(f"DEBUG: Scraping {url}")
     try:
         r = requests.get(url, headers=headers, timeout=10)
         if r.status_code != 200:
+            print(f"DEBUG: Status Code {r.status_code}")
             return pd.DataFrame()
             
         dfs = pd.read_html(StringIO(r.text))
         if not dfs:
+            print("DEBUG: No tables found via read_html")
             return pd.DataFrame()
             
         df = dfs[0]
+        print(f"DEBUG: Table found with {len(df)} rows. Columns: {df.columns.tolist()}")
+        # print(df.head(1).to_string()) # Uncomment for extreme debug
         
         # Expected columns: ['Stock', 'Transaction', 'Politician', 'Filed', 'Traded', 'Description']
-        # Data found:
-        # Transaction: "Sale $1,001 - $15,000" or "Purchase $15,001 - $50,000" -> Extract Type/Amount
-        # Politician: "Name House / D" -> Extract Name/Party
         
         trades = []
-        for _, row in df.iterrows():
+        for idx, row in df.iterrows():
             try:
                 # Parse Transaction (Type + Amount)
                 # Example: "Sale $1,001 - $15,000" or "Purchase $15,001 - $50,000"
@@ -233,16 +235,16 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                 amount = "Unknown"
                 
                 lower_trans = raw_trans.lower()
+                
+                # Logic to identify Sale/Purchase
                 if "sale" in lower_trans:
                     trans_type = "Sale"
-                    # Try to get the rest of the string as amount
-                    # e.g. "Sale (Partial) $1,001..." -> split by "Sale" or "Sale (Partial)"?
-                    # Safer: split by first '$' if present?
                     if '$' in raw_trans:
                         amount = raw_trans[raw_trans.find('$'):]
                     else:
-                         parts = raw_trans.split(' ', 1)
-                         if len(parts) > 1: amount = parts[1]
+                        parts = raw_trans.split(' ', 1)
+                        if len(parts) > 1: amount = parts[1]
+                        
                 elif "purchase" in lower_trans:
                     trans_type = "Purchase"
                     if '$' in raw_trans:
@@ -254,25 +256,28 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                          if len(parts) > 1: amount = parts[1]
                 else:
                     # Fallback for "Exchange" or other types
+                    # If we can't identify type, maybe row is bad?
+                    # But let's try standard split
                     parts = raw_trans.split(' ', 1)
                     if len(parts) > 0: trans_type = parts[0]
                     if len(parts) > 1: amount = parts[1]
 
                 # Parse Politician (Name + Chamber/Party)
-                # Example: "Julie Johnson House / D" or "Boozman, John Senate / R"
                 raw_pol = str(row.get('Politician', ''))
                 
                 chamber = "Unknown"
                 party = "Unknown"
                 rep_name = raw_pol
                 
-                # Normalize logic
                 if "House" in raw_pol:
                     chamber = "House"
-                    rep_name = raw_pol.split("House")[0].strip()
+                    # Split safely
+                    split_val = raw_pol.split("House")
+                    if len(split_val) > 0: rep_name = split_val[0].strip()
                 elif "Senate" in raw_pol:
                     chamber = "Senate"
-                    rep_name = raw_pol.split("Senate")[0].strip()
+                    split_val = raw_pol.split("Senate")
+                    if len(split_val) > 0: rep_name = split_val[0].strip()
                 
                 if "/ D" in raw_pol: party = "Democrat"
                 elif "/ R" in raw_pol: party = "Republican"
@@ -288,8 +293,15 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
                     "Price": "-" 
                 })
             except Exception as e:
-                # Skip bad rows silently
+                print(f"DEBUG: Error parsing row {idx}: {e}")
                 continue
+                
+        if trades:
+            print(f"DEBUG: Successfully parsed {len(trades)} trades")
+            return pd.DataFrame(trades)
+            
+        print("DEBUG: Trades list empty after loop")
+        return pd.DataFrame()
                 
         if trades:
             return pd.DataFrame(trades)
