@@ -156,10 +156,21 @@ if query:
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # 1. Market Data (if ticker like)
-        if query.isalpha() and len(query) < 6:
-            with st.spinner("Fetching Market Data..."):
-                market_data = data_sources.fetch_market_data(query, period=period)
+        # 1. Market Data (Smart Search)
+        # Check if query looks like a ticker (short, 1 word) or needs lookup
+        ticker = query.upper()
+        
+        # If the user typed a longer string or something that doesn't look like a standard ticker, try to resolve it
+        if len(query) > 5 or " " in query:
+             with st.spinner(f"Searching for ticker for '{query}'..."):
+                found_ticker = data_sources.lookup_ticker(query)
+                if found_ticker:
+                    ticker = found_ticker
+                    st.toast(f"Resolved '{query}' to {ticker}")
+        
+        if ticker.isalpha() and len(ticker) < 10: # Reasonable ticker length
+            with st.spinner(f"Fetching Market Data for {ticker}..."):
+                market_data = data_sources.fetch_market_data(ticker, period=period)
                 if market_data:
                     info = market_data['info']
                     current_price = info.get('currentPrice', 'N/A')
@@ -170,7 +181,7 @@ if query:
                     if isinstance(current_price, (int, float)) and isinstance(previous_close, (int, float)):
                         delta = current_price - previous_close
                     
-                    st.markdown(f"### {info.get('shortName', query.upper())} ({query.upper()})")
+                    st.markdown(f"### {info.get('shortName', ticker)} ({ticker})")
                     st.metric(
                         "Current Price", 
                         f"${current_price}", 
@@ -182,7 +193,7 @@ if query:
                     hist_data = market_data['history'].reset_index()
                     # Ensure Date column is formatted for Plotly
                     
-                    fig = px.line(hist_data, x="Date", y="Close", title=f"{query.upper()} Price History")
+                    fig = px.line(hist_data, x="Date", y="Close", title=f"{ticker} Price History")
                     fig.update_layout(
                         xaxis_title="", 
                         yaxis_title="Price (USD)",
