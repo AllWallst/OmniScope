@@ -404,15 +404,25 @@ if query:
 
             with tab6:
                 if market_data and query.isalpha():
-                    st.subheader(f"${query.upper()} Insider Trading Activity")
+                    
+                    col_h1, col_h2 = st.columns([3, 1])
+                    with col_h1:
+                        st.subheader(f"${query.upper()} Insider Trading Activity")
+                    with col_h2:
+                        insider_period = st.selectbox("Graph Period", ["1mo", "6mo", "1y", "2y", "5y", "10y", "max"], index=4, key="insider_period")
+                    
                     with st.spinner("Fetching Insider Data..."):
+                        # Fetch insider data
                         insiders = data_sources.fetch_insider_transactions(query)
                         
-                        if not insiders.empty:
+                        # Fetch history specifically for this graph period to ensure alignment
+                        insider_history = data_sources.fetch_market_data(query, period=insider_period)['history']
+                        
+                        if not insiders.empty and insider_history is not None:
                             # --- Data Processing for Graph ---
                             try:
                                 # 1. Prepare Price History
-                                history = market_data['history'].reset_index()
+                                history = insider_history.reset_index()
                                 # Ensure timezone naive for comparison
                                 if history['Date'].dt.tz is not None:
                                     history['Date'] = history['Date'].dt.tz_localize(None)
@@ -439,6 +449,11 @@ if query:
                                     
                                     # Filter only Purchases and Sales
                                     trades = df_insider[df_insider['Type'].isin(['Purchase', 'Sale'])].copy()
+                                    
+                                    # Filter trades to be within the history range
+                                    min_hist_date = history['Date'].min()
+                                    max_hist_date = history['Date'].max()
+                                    trades = trades[(trades['Date'] >= min_hist_date) & (trades['Date'] <= max_hist_date)]
                                     
                                     if not trades.empty:
                                         # Match trades to stock price
@@ -494,8 +509,9 @@ if query:
                                                     opacity=0.8,
                                                     line=dict(width=1, color='white')
                                                 ),
-                                                text=sales.apply(lambda x: f"{x['Insider']}<br>Sold {x['Shares']:,} shares<br>{x['Date'].date()}", axis=1),
-                                                hoverinfo='text'
+                                                # Robust hovertemplate for nicer tooltips
+                                                hovertemplate="<b>%{text}</b><br>Price: $%{y:.2f}<extra></extra>",
+                                                text=sales.apply(lambda x: f"{x['Insider']}<br>Sold {x['Shares']:,}<br>{x['Date'].date()}", axis=1),
                                             ))
 
                                         # 3. Insider Purchases (Green)
@@ -518,18 +534,17 @@ if query:
                                                     opacity=0.8,
                                                     line=dict(width=1, color='white')
                                                 ),
-                                                text=purchases.apply(lambda x: f"{x['Insider']}<br>Bought {x['Shares']:,} shares<br>{x['Date'].date()}", axis=1),
-                                                hoverinfo='text'
+                                                hovertemplate="<b>%{text}</b><br>Price: $%{y:.2f}<extra></extra>",
+                                                text=purchases.apply(lambda x: f"{x['Insider']}<br>Bought {x['Shares']:,}<br>{x['Date'].date()}", axis=1),
                                             ))
 
                                         fig.update_layout(
-                                            title=f"{query.upper()} Insider Trading Activity",
                                             xaxis_title="",
                                             yaxis_title="",
                                             template="plotly_dark",
                                             paper_bgcolor='rgba(0,0,0,0)',
                                             plot_bgcolor='rgba(0,0,0,0)',
-                                            margin=dict(l=0, r=0, t=40, b=0),
+                                            margin=dict(l=0, r=0, t=10, b=0),
                                             legend=dict(
                                                 yanchor="top",
                                                 y=0.99,
@@ -537,7 +552,8 @@ if query:
                                                 x=0.01,
                                                 bgcolor='rgba(0,0,0,0.5)'
                                             ),
-                                            height=400
+                                            height=400,
+                                            hovermode="x unified"
                                         )
                                         
                                         st.plotly_chart(fig, use_container_width=True)
@@ -547,20 +563,20 @@ if query:
                                         num_purchases = len(purchases)
                                         num_sales = len(sales)
                                         
-                                        # Calculate time delta
-                                        min_date = trades['Date'].min()
-                                        max_date = trades['Date'].max()
-                                        if pd.notnull(min_date) and pd.notnull(max_date):
-                                            days_diff = (max_date - min_date).days
-                                            months_diff = max(1, round(days_diff / 30))
-                                        else:
-                                            months_diff = 6
-                                            
+                                        # Calculate time delta based on the selection, not just trades found
+                                        if insider_period == "1mo": months_text = "1 month"
+                                        elif insider_period == "6mo": months_text = "6 months"
+                                        elif insider_period == "1y": months_text = "12 months"
+                                        elif insider_period == "2y": months_text = "24 months"
+                                        elif insider_period == "5y": months_text = "5 years"
+                                        elif insider_period == "10y": months_text = "10 years"
+                                        else: months_text = "recent history"
+
                                         summary_html = f"""
                                         <div style="background-color: #1C1C1E; padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-top: 12px; margin-bottom: 20px;">
                                             <p style="margin: 0; font-size: 1.0em; line-height: 1.5; color: #E5E5EA;">
                                                 <strong>{query.upper()} insiders</strong> have traded <strong>${query.upper()}</strong> stock on the open market 
-                                                <strong>{total_trades} times</strong> in the past <strong>{months_diff} months</strong>. 
+                                                <strong>{total_trades} times</strong> in the past <strong>{months_text}</strong>. 
                                                 Of those trades, <span style="color: #6EDB8E; font-weight: 600; background-color: rgba(48, 209, 88, 0.15); padding: 2px 6px; border-radius: 4px;">{num_purchases} have been purchases</span> 
                                                 and <span style="color: #FF6961; font-weight: 600; background-color: rgba(255, 69, 58, 0.15); padding: 2px 6px; border-radius: 4px;">{num_sales} have been sales</span>.
                                             </p>
@@ -569,11 +585,12 @@ if query:
                                         st.markdown(summary_html, unsafe_allow_html=True)
                                         
                                     else:
-                                        st.caption("No 'Purchase' or 'Sale' transactions found in the retrieved data.")
+                                        st.caption(f"No 'Purchase' or 'Sale' transactions found in the past {insider_period}.")
                             except Exception as e:
                                 st.error(f"Error visualizing insider data: {e}")
                                 
-                            st.dataframe(insiders)
+                            with st.expander("View Raw Insider Data"):
+                                st.dataframe(insiders)
                         else:
                             st.info("No Insider transactions found.")
                 else:
