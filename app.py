@@ -665,12 +665,15 @@ if query:
                         # No API key needed now
                         congress_data = data_sources.fetch_congress_trading(query)
                         
+                        # Get scan count from attrs safely
+                        scan_count = congress_data.attrs.get('scan_count', 0)
+                        
                         if not congress_data.empty:
                             st.dataframe(congress_data, use_container_width=True)
-                            
-                            st.info("Note: This data is filtered from the most recent congressional trades publicly reported. Older trades might not appear.")
+                            st.caption(f"Showing matches from the last {scan_count} publicly reported trades.")
                         else:
-                            st.warning("No recent congressional trading activity found for this ticker in the last ~500 tracked transactions.")
+                            msg = f"No recent congressional trading activity found for this ticker in the last {scan_count if scan_count > 0 else '~500'} tracked transactions."
+                            st.warning(msg)
                 else:
                     st.info("Enter a valid ticker symbol to view Congress trading data.")
                 
