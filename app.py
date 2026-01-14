@@ -690,6 +690,12 @@ if query:
                             st.caption("Data sourced from Quiver Quantitative. Displays recent trading activity.")
                         else:
                             st.warning("No congressional trading activity found for this ticker on Quiver Quantitative.")
+                            
+                            # Debug logs for user visibility
+                            if hasattr(congress_data, 'attrs') and 'debug_log' in congress_data.attrs:
+                                with st.expander("Show Debug Logs (For Troubleshooting)"):
+                                    for log_line in congress_data.attrs['debug_log']:
+                                        st.text(log_line)
                 else:
                     st.info("Enter a valid ticker symbol to view Congress trading data.")
                 
