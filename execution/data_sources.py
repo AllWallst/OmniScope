@@ -192,6 +192,80 @@ def fetch_pubmed_abstracts(term, max_results=5):
         print(f"Error fetching PubMed: {e}")
         return []
 
+def fetch_congress_trading(ticker_symbol, api_key=None):
+    """
+    Fetches congressional trading data by scraping capitoltrades.com/trades.
+    This does NOT require an API Key.
+    It fetches recent trades (last 5 pages) and filters for the requested ticker.
+    """
+    import requests
+    import pandas as pd
+    from io import StringIO
+    import re
+    
+    trades_url = "https://www.capitoltrades.com/trades"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+    
+    all_trades = []
+    
+    # Fetch first few pages to get a good buffer of recent trades
+    # Note: Capitol Trades uses ?page=N for pagination
+    try:
+        for page in range(1, 6): # Scrape first 5 pages (~480 trades)
+            url = f"{trades_url}?page={page}"
+            r = requests.get(url, headers=headers, timeout=10)
+            if r.status_code != 200:
+                break
+                
+            try:
+                dfs = pd.read_html(StringIO(r.text))
+                if dfs:
+                    df = dfs[0]
+                    # The 'Traded Issuer' column often looks like "Company NameTICKER:US"
+                    # We need to extract the ticker.
+                    # Example: "Abbott LaboratoriesABT:US" -> ABT
+                    
+                    # Helper to extract ticker
+                    def extract_ticker(text):
+                        if not isinstance(text, str): return ""
+                        # Regex to look for CAPITAL LETTERS followed by :US
+                        match = re.search(r'([A-Z]+):US', text)
+                        if match:
+                            return match.group(1)
+                        # Fallback: maybe just the end?
+                        return ""
+                    
+                    df['Ticker_Extracted'] = df['Traded Issuer'].apply(extract_ticker)
+                    all_trades.append(df)
+            except Exception as e:
+                pass
+                
+        if all_trades:
+            final_df = pd.concat(all_trades, ignore_index=True)
+            
+            # Filter by the requested ticker
+            target_ticker = ticker_symbol.upper()
+            filtered_df = final_df[final_df['Ticker_Extracted'] == target_ticker].copy()
+            
+            if not filtered_df.empty:
+                # Rename columns for display
+                # Expected columns from Step 260: Politician, Traded Issuer, Published, Traded, Filed After, Owner, Type, Size, Price
+                filtered_df = filtered_df[['Politician', 'Traded', 'Type', 'Size', 'Price', 'Published']].copy()
+                filtered_df.columns = ['Representative', 'Transaction Date', 'Transaction', 'Amount', 'Price', 'Disclosed']
+                
+                # Clean Representative Name (remove Party/State suffix often mashed together)
+                # E.g. "Julia LetlowRepublicanHouseLA" -> "Julia Letlow" if possible, 
+                # but "RepublicanHouseLA" is useful info. 
+                # Let's keep it as is, or try to formatting it nicely if "Type" is camelCased.
+                
+                return filtered_df
+            
+        return pd.DataFrame()
+        
+    except Exception as e:
+        print(f"Error scraping congress data: {e}")
+        return pd.DataFrame()
+
 def fetch_youtube_transcripts(ticker_symbol, limit=3):
     """
     Searches YouTube for '[Ticker] Earnings Call' and gets transcripts.
