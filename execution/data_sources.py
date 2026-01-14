@@ -215,7 +215,13 @@ def fetch_congress_trading(ticker_symbol, api_key=None):
             df_empty.attrs['debug_log'] = debug_log
             return df_empty
             
-        dfs = pd.read_html(StringIO(r.text))
+        try:
+            dfs = pd.read_html(StringIO(r.text))
+        except ImportError:
+            # Fallback to bs4 if lxml is missing (common in some environments)
+            # We know bs4 is installed since we use it for news
+            dfs = pd.read_html(StringIO(r.text), flavor='bs4')
+            
         if not dfs:
             debug_log.append("No tables found via read_html")
             df_empty = pd.DataFrame()
