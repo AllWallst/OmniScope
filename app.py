@@ -268,7 +268,7 @@ if query:
         if not all_results and not market_data:
             st.info("No results found. Try a different query or enable more sources.")
         else:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["Feed", "Financials", "Holders", "Analysis", "Social", "Insider", "Short Data", "Management"])
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["Feed", "Financials", "Holders", "Analysis", "Social", "Insider", "Short Data", "Management", "Congress"])
             
             with tab1:
                 # Iterate and show documents
@@ -648,6 +648,24 @@ if query:
                         st.info("No Executive info available.")
                 else:
                     st.info("Enter a ticker to see Management.")
+            
+            with tab9:
+                if query.isalpha():
+                    st.subheader(f"Recent Congressional Trading on ${query.upper()}")
+                    st.markdown("*Data Source: Capitol Trades (Scraping recent ~500 transactions matches)*")
+                    
+                    with st.spinner("Fetching Congress Data..."):
+                        # No API key needed now
+                        congress_data = data_sources.fetch_congress_trading(query)
+                        
+                        if not congress_data.empty:
+                            st.dataframe(congress_data, use_container_width=True)
+                            
+                            st.info("Note: This data is filtered from the most recent congressional trades publicly reported. Older trades might not appear.")
+                        else:
+                            st.warning("No recent congressional trading activity found for this ticker in the last ~500 tracked transactions.")
+                else:
+                    st.info("Enter a valid ticker symbol to view Congress trading data.")
                 
     with col2:
         st.markdown("### Quick Insights")
