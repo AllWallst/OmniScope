@@ -5,9 +5,13 @@ import os
 import plotly.express as px
 
 # Add project root to path to import local modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from projects.alpha_stream.execution import data_sources
+try:
+    from execution import data_sources
+except ImportError:
+    # Fallback for local dev if run from different CWD
+    from projects.alpha_stream.execution import data_sources
 
 st.set_page_config(layout="wide", page_title="OmniScope", page_icon="🔭")
 
@@ -15,54 +19,105 @@ st.set_page_config(layout="wide", page_title="OmniScope", page_icon="🔭")
 def load_css():
     st.markdown("""
         <style>
-        /* Modern Dark Theme with Glassmorphism */
+        /* Modern Apple-style Dark Theme */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        
         .stApp {
-            background-color: #0e1117;
-            font-family: 'Inter', sans-serif;
+            background-color: #000000; /* Pure Black OLED friendly */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         
-        /* Sidebar styling */
+        /* Sidebar styling - Translucent and blurry */
         .css-1d391kg {
-            background-color: #161b22;
+            background-color: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        /* Card styling for results */
+        /* Card styling - Apple Card Style */
         .doc-card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-left: 5px solid #00D4FF; /* Cyan accent */
+            background-color: #1C1C1E; /* Dark Gray */
+            color: #F5F5F7;
+            border-radius: 18px; /* Apple rounded corners */
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .doc-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
         }
         .doc-meta {
-            font-size: 0.8em;
-            color: #666;
-            margin-bottom: 5px;
+            font-size: 0.75em;
+            color: #8E8E93; /* Apple System Gray */
+            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            font-weight: 500;
         }
         .doc-title {
-            font-size: 1.1em;
+            font-size: 1.25em;
             font-weight: 600;
-            color: #1a73e8;
+            color: #2997FF; /* Apple System Blue */
             text-decoration: none;
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
         .doc-title:hover {
-            text-decoration: underline;
+            color: #64D2FF; /* Lighter blue on hover */
+            text-decoration: none;
         }
         .doc-card p {
-            color: #333333; /* Force dark text for readability on white card */
+            color: #D1D1D6; /* Light gray text */
             font-size: 0.95em;
-            line-height: 1.5;
+            line-height: 1.6;
+            font-weight: 400;
         }
+        
+        /* Segmented Control / Tabs Styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 12px;
+            background-color: #1C1C1E;
+            padding: 8px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 40px;
+            white-space: pre-wrap;
+            background-color: transparent;
+            border-radius: 10px;
+            gap: 1px;
+            padding: 8px 16px;
+            color: #8E8E93;
+            font-weight: 500;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #636366; /* System Gray 2 */
+            color: #FFFFFF;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        /* Input Fields */
+        .stTextInput > div > div > input {
+            background-color: #1C1C1E;
+            color: white;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 15px;
+        }
+        .stSelectbox > div > div > div {
+             background-color: #1C1C1E;
+             color: white;
+             border-radius: 12px;
+        }
+
         </style>
     """, unsafe_allow_html=True)
 
