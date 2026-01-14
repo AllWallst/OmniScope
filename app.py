@@ -404,10 +404,175 @@ if query:
 
             with tab6:
                 if market_data and query.isalpha():
-                    st.subheader("Insider Transactions")
+                    st.subheader(f"${query.upper()} Insider Trading Activity")
                     with st.spinner("Fetching Insider Data..."):
                         insiders = data_sources.fetch_insider_transactions(query)
+                        
                         if not insiders.empty:
+                            # --- Data Processing for Graph ---
+                            try:
+                                # 1. Prepare Price History
+                                history = market_data['history'].reset_index()
+                                # Ensure timezone naive for comparison
+                                if history['Date'].dt.tz is not None:
+                                    history['Date'] = history['Date'].dt.tz_localize(None)
+                                
+                                # 2. Prepare Insider Data
+                                df_insider = insiders.copy()
+                                if 'Start Date' in df_insider.columns:
+                                    # Ensure timezone naive
+                                    df_insider['Date'] = pd.to_datetime(df_insider['Start Date'])
+                                    if df_insider['Date'].dt.tz is not None:
+                                        df_insider['Date'] = df_insider['Date'].dt.tz_localize(None)
+                                    
+                                    # Filter for relevant transaction types
+                                    def get_trade_type(text):
+                                        text = str(text).lower()
+                                        if 'sale' in text or 'm - ' in text: 
+                                            return 'Sale'
+                                        elif 'purchase' in text or 'buy' in text:
+                                            return 'Purchase'
+                                        return 'Other'
+
+                                    col_to_check = 'Text' if 'Text' in df_insider.columns else 'Transaction'
+                                    df_insider['Type'] = df_insider[col_to_check].apply(get_trade_type)
+                                    
+                                    # Filter only Purchases and Sales
+                                    trades = df_insider[df_insider['Type'].isin(['Purchase', 'Sale'])].copy()
+                                    
+                                    if not trades.empty:
+                                        # Match trades to stock price
+                                        history_lookup = history.set_index('Date')['Close'].sort_index()
+                                        
+                                        trade_prices = []
+                                        for d in trades['Date']:
+                                            try:
+                                                # Use get_indexer to find nearest position
+                                                idx = history_lookup.index.get_indexer([d], method='nearest')[0]
+                                                price = history_lookup.iloc[idx]
+                                                trade_prices.append(price)
+                                            except:
+                                                trade_prices.append(None)
+                                        
+                                        trades['Price'] = trade_prices
+                                        trades = trades.dropna(subset=['Price'])
+
+                                        # --- Plotting ---
+                                        import plotly.graph_objects as go
+                                        import numpy as np
+
+                                        fig = go.Figure()
+
+                                        # 1. Stock Price Line
+                                        fig.add_trace(go.Scatter(
+                                            x=history['Date'], 
+                                            y=history['Close'],
+                                            mode='lines',
+                                            name='Price',
+                                            line=dict(color='#8E8E93', width=1.5),
+                                            hoverinfo='y+x'
+                                        ))
+                                        
+                                        # 2. Insider Sales (Red)
+                                        sales = trades[trades['Type'] == 'Sale']
+                                        if not sales.empty:
+                                            # Scale bubble size
+                                            sizes = np.log1p(sales['Shares'].abs().astype(float))
+                                            if sizes.max() != sizes.min():
+                                                sizes = 5 + ((sizes - sizes.min()) / (sizes.max() - sizes.min())) * 15
+                                            else:
+                                                sizes = 10
+                                            
+                                            fig.add_trace(go.Scatter(
+                                                x=sales['Date'],
+                                                y=sales['Price'],
+                                                mode='markers',
+                                                name='Sales',
+                                                marker=dict(
+                                                    color='#FF453A',
+                                                    size=sizes,
+                                                    opacity=0.8,
+                                                    line=dict(width=1, color='white')
+                                                ),
+                                                text=sales.apply(lambda x: f"{x['Insider']}<br>Sold {x['Shares']:,} shares<br>{x['Date'].date()}", axis=1),
+                                                hoverinfo='text'
+                                            ))
+
+                                        # 3. Insider Purchases (Green)
+                                        purchases = trades[trades['Type'] == 'Purchase']
+                                        if not purchases.empty:
+                                            sizes = np.log1p(purchases['Shares'].abs().astype(float))
+                                            if sizes.max() != sizes.min():
+                                                sizes = 5 + ((sizes - sizes.min()) / (sizes.max() - sizes.min())) * 15
+                                            else:
+                                                sizes = 10
+                                                
+                                            fig.add_trace(go.Scatter(
+                                                x=purchases['Date'],
+                                                y=purchases['Price'],
+                                                mode='markers',
+                                                name='Purchases',
+                                                marker=dict(
+                                                    color='#30D158',
+                                                    size=sizes,
+                                                    opacity=0.8,
+                                                    line=dict(width=1, color='white')
+                                                ),
+                                                text=purchases.apply(lambda x: f"{x['Insider']}<br>Bought {x['Shares']:,} shares<br>{x['Date'].date()}", axis=1),
+                                                hoverinfo='text'
+                                            ))
+
+                                        fig.update_layout(
+                                            title=f"{query.upper()} Insider Trading Activity",
+                                            xaxis_title="",
+                                            yaxis_title="",
+                                            template="plotly_dark",
+                                            paper_bgcolor='rgba(0,0,0,0)',
+                                            plot_bgcolor='rgba(0,0,0,0)',
+                                            margin=dict(l=0, r=0, t=40, b=0),
+                                            legend=dict(
+                                                yanchor="top",
+                                                y=0.99,
+                                                xanchor="left",
+                                                x=0.01,
+                                                bgcolor='rgba(0,0,0,0.5)'
+                                            ),
+                                            height=400
+                                        )
+                                        
+                                        st.plotly_chart(fig, use_container_width=True)
+                                        
+                                        # --- Summary Text ---
+                                        total_trades = len(trades)
+                                        num_purchases = len(purchases)
+                                        num_sales = len(sales)
+                                        
+                                        # Calculate time delta
+                                        min_date = trades['Date'].min()
+                                        max_date = trades['Date'].max()
+                                        if pd.notnull(min_date) and pd.notnull(max_date):
+                                            days_diff = (max_date - min_date).days
+                                            months_diff = max(1, round(days_diff / 30))
+                                        else:
+                                            months_diff = 6
+                                            
+                                        summary_html = f"""
+                                        <div style="background-color: #1C1C1E; padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-top: 12px; margin-bottom: 20px;">
+                                            <p style="margin: 0; font-size: 1.0em; line-height: 1.5; color: #E5E5EA;">
+                                                <strong>{query.upper()} insiders</strong> have traded <strong>${query.upper()}</strong> stock on the open market 
+                                                <strong>{total_trades} times</strong> in the past <strong>{months_diff} months</strong>. 
+                                                Of those trades, <span style="color: #6EDB8E; font-weight: 600; background-color: rgba(48, 209, 88, 0.15); padding: 2px 6px; border-radius: 4px;">{num_purchases} have been purchases</span> 
+                                                and <span style="color: #FF6961; font-weight: 600; background-color: rgba(255, 69, 58, 0.15); padding: 2px 6px; border-radius: 4px;">{num_sales} have been sales</span>.
+                                            </p>
+                                        </div>
+                                        """
+                                        st.markdown(summary_html, unsafe_allow_html=True)
+                                        
+                                    else:
+                                        st.caption("No 'Purchase' or 'Sale' transactions found in the retrieved data.")
+                            except Exception as e:
+                                st.error(f"Error visualizing insider data: {e}")
+                                
                             st.dataframe(insiders)
                         else:
                             st.info("No Insider transactions found.")
