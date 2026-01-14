@@ -658,22 +658,29 @@ if query:
             
             with tab9:
                 if query.isalpha():
-                    st.subheader(f"Recent Congressional Trading on ${query.upper()}")
-                    st.markdown("*Data Source: Capitol Trades (Scraping recent ~500 transactions matches)*")
+                    st.subheader(f"Congressional Trading on ${query.upper()}")
+                    st.markdown("*Data Source: Quiver Quantitative*")
                     
                     with st.spinner("Fetching Congress Data..."):
                         # No API key needed now
                         congress_data = data_sources.fetch_congress_trading(query)
                         
-                        # Get scan count from attrs safely
-                        scan_count = congress_data.attrs.get('scan_count', 0)
-                        
                         if not congress_data.empty:
                             st.dataframe(congress_data, use_container_width=True)
-                            st.caption(f"Showing matches from the last {scan_count} publicly reported trades.")
+                            
+                            # Simple stats
+                            dem_trades = len(congress_data[congress_data['Party'] == 'Democrat'])
+                            rep_trades = len(congress_data[congress_data['Party'] == 'Republican'])
+                            
+                            col_c1, col_c2 = st.columns(2)
+                            with col_c1:
+                                st.metric("Democrat Trades", dem_trades)
+                            with col_c2:
+                                st.metric("Republican Trades", rep_trades)
+                                
+                            st.caption("Data sourced from Quiver Quantitative. Displays recent trading activity.")
                         else:
-                            msg = f"No recent congressional trading activity found for this ticker in the last {scan_count if scan_count > 0 else '~500'} tracked transactions."
-                            st.warning(msg)
+                            st.warning("No congressional trading activity found for this ticker on Quiver Quantitative.")
                 else:
                     st.info("Enter a valid ticker symbol to view Congress trading data.")
                 
