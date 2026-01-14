@@ -9,9 +9,16 @@ import plotly.express as px
 
 try:
     from execution import data_sources
+    import importlib
+    importlib.reload(data_sources)
 except ImportError:
     # Fallback for local dev if run from different CWD
-    from projects.alpha_stream.execution import data_sources
+    try:
+        from projects.alpha_stream.execution import data_sources
+        import importlib
+        importlib.reload(data_sources)
+    except ImportError:
+        pass
 
 st.set_page_config(layout="wide", page_title="OmniScope", page_icon="🔭")
 
