@@ -27,6 +27,15 @@
 *   **Sentiment Engine**: Powered by `TextBlob`, OmniScope analyzes thousands of headlines and social comments to generate real-time **Polarity** (Positive/Negative) and **Subjectivity** scores.
 *   **Management Profiling**: Profiles of key executives, including compensation and tenure.
 
+### 5. Congressional Trading
+-   **Data Source**: Capitol Trades (Scraped).
+-   **Features**:
+    -   Tracks stock trades by US Senators and Representatives.
+    -   Displays filtered transaction details (Purchases, Sales, Amounts).
+    -   Data is scraped live from recent transactions (last ~500 trades).
+    
+    *Note*: Displays matches from the most recent global activity. Older trades for a specific ticker may not appear if they are not in the recent batch.
+
 ## 🛠️ Technology Stack
 *   **Frontend**: Streamlit (Python)
 *   **Data Visualization**: Plotly Express
