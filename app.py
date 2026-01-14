@@ -160,13 +160,19 @@ if query:
         # Check if query looks like a ticker (short, 1 word) or needs lookup
         ticker = query.upper()
         
-        # If the user typed a longer string or something that doesn't look like a standard ticker, try to resolve it
-        if len(query) > 5 or " " in query:
-             with st.spinner(f"Searching for ticker for '{query}'..."):
+        # Heuristic: If it contains spaces OR is longer than 3 chars, it might be a company name.
+        # "Ford" -> "F", "Apple" -> "AAPL", "Microsoft" -> "MSFT"
+        if len(query) > 3 or " " in query:
+             with st.spinner(f"Verifying ticker for '{query}'..."):
                 found_ticker = data_sources.lookup_ticker(query)
                 if found_ticker:
-                    ticker = found_ticker
-                    st.toast(f"Resolved '{query}' to {ticker}")
+                    # Only switch and notify if it's different/better
+                    if found_ticker != ticker:
+                        ticker = found_ticker
+                        st.toast(f"Resolved '{query}' to {ticker}")
+                    else:
+                        # It was already a correct ticker (e.g. "MSFT" -> "MSFT")
+                        ticker = found_ticker
         
         if ticker.isalpha() and len(ticker) < 10: # Reasonable ticker length
             with st.spinner(f"Fetching Market Data for {ticker}..."):
