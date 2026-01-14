@@ -210,7 +210,12 @@ if query:
                     # Plotly default is usually good, but we can enforce it:
                     fig.update_yaxes(autorange=True, fixedrange=False) 
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    # Note: "use_container_width" is deprecated in favor of "width" in some versions,
+                    # but "width='stretch'" is the specific replacement requested by the warning.
+                    try:
+                       st.plotly_chart(fig, width="stretch") # As per warning instructions
+                    except:
+                       st.plotly_chart(fig, use_container_width=True) # Fallback if that parameter doesn't exist yet
 
         all_results = []
         
@@ -454,7 +459,7 @@ if query:
                                 "Name": officer.get('name', 'N/A'),
                                 "Title": officer.get('title', 'N/A'),
                                 "Pay": f"${officer.get('totalPay', 0):,}" if officer.get('totalPay') else "N/A",
-                                "Year Born": officer.get('yearBorn', 'N/A')
+                                "Year Born": str(officer.get('yearBorn', 'N/A')) # Force string to avoid mixed-type Arrow errors
                             })
                         st.dataframe(pd.DataFrame(clean_officers))
                     else:
