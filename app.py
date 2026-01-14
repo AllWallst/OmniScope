@@ -274,7 +274,62 @@ if query:
             with tab3:
                 if market_data:
                     st.subheader("Major Holders")
-                    st.dataframe(market_data.get('major_holders'))
+                    major_holders = market_data.get('major_holders')
+                    if major_holders is not None and not major_holders.empty:
+                        try:
+                            # 1. Standardize Columns
+                            # yfinance often returns Description as Index and 'Value' as text/float
+                            major_holders.reset_index(inplace=True)
+                            major_holders.columns = ["Description", "Value"]
+                            
+                            # 2. Process Rows
+                            clean_rows = []
+                            
+                            # Mapping schema: Raw Key -> (Display Text, IsPercent)
+                            # We check if the current description matches keys or partial text
+                            formatting_map = {
+                                "insidersPercentHeld": ("% of Shares Held by All Insider", True),
+                                "institutionsPercentHeld": ("% of Shares Held by Institutions", True),
+                                "institutionsFloatPercentHeld": ("% of Float Held by Institutions", True),
+                                "institutionsCount": ("Number of Institutions Holding Shares", False)
+                            }
+
+                            for index, row in major_holders.iterrows():
+                                desc = str(row.get('Description', ''))
+                                val = row.get('Value', 0)
+                                
+                                # Default to current values
+                                final_desc = desc
+                                final_val = val
+                                is_percent = True # Default behavior for this table unless specified
+                                
+                                # Check if we have a specific map for this row
+                                if desc in formatting_map:
+                                    final_desc, is_percent = formatting_map[desc]
+                                elif "Count" in desc or "Number" in desc:
+                                    is_percent = False
+                                
+                                # Apply Formatting
+                                try:
+                                    if is_percent:
+                                        if isinstance(val, (float, int)):
+                                            final_val = f"{val:.2%}"
+                                    else:
+                                        # Number format (comma separated)
+                                        if isinstance(val, (float, int)):
+                                            final_val = f"{int(val):,}"
+                                except:
+                                    pass # Keep original if format fails
+                                    
+                                clean_rows.append({"Value": final_val, "Description": final_desc})
+                            
+                            st.table(pd.DataFrame(clean_rows))
+                        except Exception as e:
+                            st.error(f"Error formatting holders: {e}")
+                            st.dataframe(major_holders)
+                    else:
+                        st.info("No Major Holders data.")
+
                     st.subheader("Institutional Holders")
                     st.dataframe(market_data.get('institutional_holders'))
                 else:
