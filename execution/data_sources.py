@@ -342,7 +342,7 @@ def fetch_insider_transactions(ticker_symbol):
         insiders = ticker.insider_transactions
         if insiders is not None and not insiders.empty:
             # Clean up for display if needed
-            return insiders.head(20)
+            return insiders
         return pd.DataFrame()
     except Exception as e:
         print(f"Error fetching insider data: {e}")
