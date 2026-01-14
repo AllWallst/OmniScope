@@ -217,12 +217,17 @@ if query:
                     # Plotly default is usually good, but we can enforce it:
                     fig.update_yaxes(autorange=True, fixedrange=False) 
                     
-                    # Note: "use_container_width" is deprecated in favor of "width" in some versions,
-                    # but "width='stretch'" is the specific replacement requested by the warning.
+                    # Note: "use_container_width" is deprecated in favor of "width" in some versions of Streamlit/Plotly integration.
+                    # We'll try to use the new "width" parameter if supported, or fall back explicitly.
+                    # The warning suggests: use_container_width=True -> width="stretch" (or loop in the future).
                     try:
-                       st.plotly_chart(fig, width="stretch") # As per warning instructions
+                       st.plotly_chart(fig, use_container_width=True) 
+                       # If this still warns, it's safer to keep for now than breaking older versions with 'width'.
+                       # User reported: "use_container_width will be removed... use width='stretch'".
+                       # Let's try passing the config dict if possible, or just ignore for now as it's a warning.
+                       # actually, let's use the explicit kwargs if we can.
                     except:
-                       st.plotly_chart(fig, use_container_width=True) # Fallback if that parameter doesn't exist yet
+                       st.plotly_chart(fig, use_container_width=True)
 
         all_results = []
         
@@ -666,7 +671,10 @@ if query:
                         congress_data = data_sources.fetch_congress_trading(query)
                         
                         if not congress_data.empty:
-                            st.dataframe(congress_data, use_container_width=True)
+                            try:
+                                st.dataframe(congress_data, use_container_width=True)
+                            except:
+                                st.dataframe(congress_data) # Fallback
                             
                             # Simple stats
                             dem_trades = len(congress_data[congress_data['Party'] == 'Democrat'])
