@@ -145,6 +145,11 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("Filters")
     date_range = st.date_input("Date Range", [])
+    
+    st.markdown("---")
+    if st.button("🔄 Reset Data Cache", help="Click if data is missing or stale."):
+        st.cache_data.clear()
+        st.rerun()
 
 # Main Layout
 st.title("Market Intelligence Search")
@@ -740,3 +745,4 @@ if query:
             st.write(f"**Mentions (News & Social)**: {len(sentences_to_analyze)} data points analyzed")
         else:
             st.info("Select a document to view details.")
+
