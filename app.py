@@ -384,10 +384,10 @@ if query:
                         st.info("No Analysis data available.")
                 
                 with col_a2:
-                    if market_data and query.isalpha():
+                    if market_data and ticker:
                         st.subheader("ESG Risk Ratings")
                         with st.spinner("Fetching ESG Data..."):
-                            esg_data = data_sources.fetch_esg_data(query)
+                            esg_data = data_sources.fetch_esg_data(ticker)
                             if not esg_data.empty:
                                 st.dataframe(esg_data)
                             else:
@@ -396,7 +396,7 @@ if query:
                     st.markdown("---")
                     st.subheader("Options Sentiment")
                     with st.spinner("Analyzing Options Chain..."):
-                        pc_ratio, exp_date, puts, calls = data_sources.fetch_options_sentiment(query)
+                        pc_ratio, exp_date, puts, calls = data_sources.fetch_options_sentiment(ticker)
                         if pc_ratio is not None:
                             st.metric("Put/Call Ratio", f"{pc_ratio:.2f}", help=">1 Bearish, <1 Bullish")
                             st.caption(f"Expiration: {exp_date} | Calls: {calls:,} | Puts: {puts:,}")
@@ -420,20 +420,20 @@ if query:
                     st.info("No recent social discussions found.")
 
             with tab6:
-                if market_data and query.isalpha():
+                if market_data:
                     
                     col_h1, col_h2 = st.columns([3, 1])
                     with col_h1:
-                        st.subheader(f"${query.upper()} Insider Trading Activity")
+                        st.subheader(f"${ticker} Insider Trading Activity")
                     with col_h2:
                         insider_period = st.selectbox("Graph Period", ["1mo", "6mo", "1y", "2y", "5y", "10y", "max"], index=4, key="insider_period")
                     
                     with st.spinner("Fetching Insider Data..."):
                         # Fetch insider data
-                        insiders = data_sources.fetch_insider_transactions(query)
+                        insiders = data_sources.fetch_insider_transactions(ticker)
                         
                         # Fetch history specifically for this graph period to ensure alignment
-                        market_hist_payload = data_sources.fetch_market_data(query, period=insider_period)
+                        market_hist_payload = data_sources.fetch_market_data(ticker, period=insider_period)
                         insider_history = market_hist_payload['history'] if market_hist_payload else None
                         
                         if not insiders.empty and insider_history is not None:
@@ -668,13 +668,13 @@ if query:
                     st.info("Enter a ticker to see Management.")
             
             with tab9:
-                if query.isalpha():
-                    st.subheader(f"Congressional Trading on ${query.upper()}")
+                if ticker:
+                    st.subheader(f"Congressional Trading on ${ticker}")
                     st.markdown("*Data Source: Quiver Quantitative*")
                     
                     with st.spinner("Fetching Congress Data..."):
                         # No API key needed now
-                        congress_data = data_sources.fetch_congress_trading(query)
+                        congress_data = data_sources.fetch_congress_trading(ticker)
                         
                         if not congress_data.empty:
                             try:
