@@ -9,3 +9,4 @@ biopython
 plotly
 textblob
 lxml
+html5lib
