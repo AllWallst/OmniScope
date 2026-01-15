@@ -277,7 +277,7 @@ if query:
                     all_results.append(item)
 
         # Display Results in Tabs
-        if not all_results and not market_data:
+        if not all_results and not market_data and len(query) < 2:
             st.info("No results found. Try a different query or enable more sources.")
         else:
             tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["Feed", "Financials", "Holders", "Analysis", "Social", "Insider", "Short Data", "Management", "Congress"])
@@ -428,7 +428,8 @@ if query:
                         insiders = data_sources.fetch_insider_transactions(query)
                         
                         # Fetch history specifically for this graph period to ensure alignment
-                        insider_history = data_sources.fetch_market_data(query, period=insider_period)['history']
+                        market_hist_payload = data_sources.fetch_market_data(query, period=insider_period)
+                        insider_history = market_hist_payload['history'] if market_hist_payload else None
                         
                         if not insiders.empty and insider_history is not None:
                             # --- Data Processing for Graph ---
@@ -739,4 +740,3 @@ if query:
             st.write(f"**Mentions (News & Social)**: {len(sentences_to_analyze)} data points analyzed")
         else:
             st.info("Select a document to view details.")
-
